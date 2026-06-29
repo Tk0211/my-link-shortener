@@ -10,6 +10,7 @@ export async function GET(
   try {
     const { shortCode } = await params;
 
+    // 只获取基本信息，不查 clicks 表
     const { data: linkData, error: linkError } = await supabase
       .from('links')
       .select('click_count, long_url, created_at, expires_at')
@@ -20,40 +21,12 @@ export async function GET(
       return NextResponse.json({ error: '短链接不存在' }, { status: 404 });
     }
 
-    const { data: deviceStats } = await supabase
-      .from('clicks')
-      .select('device_type')
-      .eq('short_code', shortCode);
-
-    const deviceCount: Record<string, number> = {};
-    if (deviceStats) {
-      deviceStats.forEach((item: any) => {
-        const key = item.device_type || 'Unknown';
-        deviceCount[key] = (deviceCount[key] || 0) + 1;
-      });
-    }
-
-    const { data: browserStats } = await supabase
-      .from('clicks')
-      .select('browser')
-      .eq('short_code', shortCode);
-
-    const browserCount: Record<string, number> = {};
-    if (browserStats) {
-      browserStats.forEach((item: any) => {
-        const key = item.browser || 'Unknown';
-        browserCount[key] = (browserCount[key] || 0) + 1;
-      });
-    }
-
     return NextResponse.json({
       short_code: shortCode,
       total_clicks: linkData.click_count || 0,
       long_url: linkData.long_url,
       created_at: linkData.created_at,
       expires_at: linkData.expires_at,
-      device_distribution: deviceCount,
-      browser_distribution: browserCount,
     });
   } catch (err) {
     console.error(err);

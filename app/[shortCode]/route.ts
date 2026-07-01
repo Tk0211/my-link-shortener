@@ -12,35 +12,41 @@ export async function GET(
     const { shortCode } = await params;
     console.log('🔍 查询短码:', shortCode);
 
-    // 1. 查询短链接
+    // 查询短链接（包括已删除的，以便判断）
     const { data, error } = await supabase
       .from('links')
-      .select('long_url, expires_at, click_count')
+      .select('long_url, expires_at, click_count, deleted_at')
       .eq('short_code', shortCode)
       .maybeSingle();
 
-    if (error) {
-      console.error('❌ 数据库查询错误:', error);
-      return NextResponse.json({ error: '数据库查询失败' }, { status: 500 });
-    }
-
-    if (!data) {
-      console.log('❌ 短链接不存在:', shortCode);
+    if (error || !data) {
       return NextResponse.json({ error: '短链接不存在' }, { status: 404 });
     }
 
-    // 2. 检查是否过期
-    if (data.expires_at && new Date(data.expires_at) < new Date()) {
-      console.log('⏰ 短链接已过期:', shortCode);
-      return NextResponse.json({ error: '短链接已过期' }, { status: 410 });
+    // 如果已在回收站
+    if (data.deleted_at) {
+      return NextResponse.json({ error: '短链接已被删除' }, { status: 410 });
     }
 
-    // 3. 获取客户端信息
+    // 检查是否过期
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      // 自动移入回收站
+      await supabase
+        .from('links')
+        .update({
+          deleted_at: new Date().toISOString(),
+          delete_reason: 'expired',
+        })
+        .eq('short_code', shortCode);
+
+      return NextResponse.json({ error: '短链接已过期，已移入回收站' }, { status: 410 });
+    }
+
+    // 获取客户端信息
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || '';
     const referer = request.headers.get('referer') || '';
 
-    // 4. 解析设备信息
     let deviceType = 'Unknown';
     let browser = 'Unknown';
     let os = 'Unknown';
@@ -63,54 +69,33 @@ export async function GET(
       else if (userAgent.includes('iOS') || userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
     }
 
-    // 5. 记录点击（异步，但增加详细日志）
+    // 记录点击
     const logClick = async () => {
-      console.log('📝 开始记录点击:', shortCode);
       try {
-        const insertData = {
-          short_code: shortCode,
-          ip: ip,
-          user_agent: userAgent,
-          referer: referer,
-          device_type: deviceType,
-          browser: browser,
-          os: os,
-        };
-        console.log('📤 准备插入数据:', JSON.stringify(insertData));
-
-        const { error: insertError } = await supabase
-          .from('clicks')
-          .insert([insertData]);
-
-        if (insertError) {
-          console.error('❌ Supabase 插入错误:', insertError);
-          return;
-        }
-
-        console.log('✅ 插入成功');
-
-        // 更新总点击次数
-        const { error: updateError } = await supabase
+        await supabase.from('clicks').insert([
+          {
+            short_code: shortCode,
+            ip: ip,
+            user_agent: userAgent,
+            referer: referer,
+            device_type: deviceType,
+            browser: browser,
+            os: os,
+          },
+        ]);
+        await supabase
           .from('links')
           .update({ click_count: (data.click_count || 0) + 1 })
           .eq('short_code', shortCode);
-
-        if (updateError) {
-          console.error('❌ 更新 click_count 失败:', updateError);
-        } else {
-          console.log('📊 点击记录已保存:', shortCode);
-        }
+        console.log('📊 点击记录已保存:', shortCode);
       } catch (err) {
-        console.error('❌ 记录点击异常:', err);
+        console.error('❌ 记录点击失败:', err);
       }
     };
 
-    // 触发记录（不等待）
     logClick();
 
     console.log('✅ 跳转:', shortCode, '→', data.long_url);
-    
-    // 6. 重定向
     return NextResponse.redirect(data.long_url, { status: 302 });
 
   } catch (err) {

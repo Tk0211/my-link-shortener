@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 
-// 获取回收站列表
 export async function GET(request: Request) {
   try {
     const cookieStore = await cookies();
@@ -17,7 +16,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from('links')
       .select('*')
-      .not('deleted_at', 'is', null)  // 只查已删除的
+      .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false });
 
     if (type) {
@@ -27,7 +26,6 @@ export async function GET(request: Request) {
     const { data: links, error } = await query;
     if (error) throw error;
 
-    // 格式化删除时间
     const result = links.map(link => ({
       ...link,
       deleted_at_formatted: link.deleted_at ? new Date(link.deleted_at).toLocaleString('zh-CN') : null,
@@ -55,7 +53,6 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: '请选择要恢复的短码' }, { status: 400 });
     }
 
-    // 恢复：将 deleted_at 设为 null
     const { error } = await supabase
       .from('links')
       .update({
@@ -87,7 +84,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: '请选择要永久删除的短码' }, { status: 400 });
     }
 
-    // 物理删除
     const { error } = await supabase
       .from('links')
       .delete()

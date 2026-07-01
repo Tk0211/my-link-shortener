@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 
-// 获取列表（只显示未删除的）
+// 定义统计数据的类型
+interface LinkStats {
+  devices: Record<string, number>;
+  browsers: Record<string, number>;
+  oss: Record<string, number>;
+  ips: string[];
+}
+
 export async function GET(request: Request) {
   try {
     const cookieStore = await cookies();
@@ -17,7 +24,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from('links')
       .select('*')
-      .is('deleted_at', null)  // 只查未删除的
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (type) {
@@ -30,7 +37,7 @@ export async function GET(request: Request) {
     // 获取点击统计
     const { data: allClicks } = await supabase.from('clicks').select('short_code, device_type, browser, os, ip');
 
-    const statsMap: Record<string, any> = {};
+    const statsMap: Record<string, LinkStats> = {};
     if (allClicks) {
       for (const click of allClicks) {
         const code = click.short_code;
@@ -40,6 +47,7 @@ export async function GET(request: Request) {
         const device = click.device_type || 'Unknown';
         const browser = click.browser || 'Unknown';
         const os = click.os || 'Unknown';
+        // 明确类型为 number
         statsMap[code].devices[device] = (statsMap[code].devices[device] || 0) + 1;
         statsMap[code].browsers[browser] = (statsMap[code].browsers[browser] || 0) + 1;
         statsMap[code].oss[os] = (statsMap[code].oss[os] || 0) + 1;
@@ -54,8 +62,12 @@ export async function GET(request: Request) {
       const stats = statsMap[link.short_code] || { devices: {}, browsers: {}, oss: {}, ips: [] };
       let mainDevice = '无数据';
       let maxCount = 0;
-      for (const [device, count] of Object.entries(stats.devices)) {
-        if (count > maxCount) { maxCount = count; mainDevice = device; }
+      // 明确类型，使用 for...of 配合 Object.entries 并断言类型
+      for (const [device, count] of Object.entries(stats.devices) as [string, number][]) {
+        if (count > maxCount) {
+          maxCount = count;
+          mainDevice = device;
+        }
       }
       const total = Object.values(stats.devices).reduce((a: number, b: number) => a + b, 0);
       const percent = total > 0 ? Math.round((maxCount / total) * 100) : 0;
@@ -98,7 +110,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: '请选择要删除的短码' }, { status: 400 });
     }
 
-    // 软删除：设置 deleted_at 和 delete_reason
     const { error } = await supabase
       .from('links')
       .update({

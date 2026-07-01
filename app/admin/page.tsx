@@ -61,7 +61,7 @@ export default function AdminDashboard() {
   // ========== 切换选项卡时重新获取数据 ==========
   useEffect(() => {
     const isRecycle = activeTab === 'recycle';
-    const type = isRecycle ? undefined : activeTab;
+    const type = isRecycle ? undefined : (activeTab === 'qrcode' ? 'shorten' : activeTab);
     fetchLinks(type, isRecycle);
     setSelected(new Set());
   }, [activeTab]);

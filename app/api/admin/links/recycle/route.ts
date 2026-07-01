@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const result = links.map(link => ({
       ...link,
-      deleted_at_formatted: link.deleted_at ? new Date(link.deleted_at).toLocaleString('zh-CN') : null,
+      deleted_at_formatted: link.deleted_at ? new Date(link.deleted_at).toLocaleString('zh-CN') : '-',
       delete_reason_label: link.delete_reason === 'manual' ? '手动删除' : link.delete_reason === 'expired' ? '自动过期' : '未知',
     }));
 
@@ -39,7 +39,6 @@ export async function GET(request: Request) {
   }
 }
 
-// 批量恢复
 export async function PUT(request: Request) {
   try {
     const cookieStore = await cookies();
@@ -70,7 +69,6 @@ export async function PUT(request: Request) {
   }
 }
 
-// 批量永久删除
 export async function DELETE(request: Request) {
   try {
     const cookieStore = await cookies();

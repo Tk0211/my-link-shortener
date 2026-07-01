@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   const [showDetail, setShowDetail] = useState(false);
   const router = useRouter();
 
+  // ========== 获取数据 ==========
   const fetchLinks = async (type?: string, isRecycle = false) => {
     try {
       const endpoint = isRecycle ? '/api/admin/links/recycle' : '/api/admin/links';
@@ -57,9 +58,9 @@ export default function AdminDashboard() {
     }
   };
 
+  // ========== 切换选项卡时重新获取数据 ==========
   useEffect(() => {
     const isRecycle = activeTab === 'recycle';
-    // 回收站不传 type 过滤，显示所有类型
     const type = isRecycle ? undefined : activeTab;
     fetchLinks(type, isRecycle);
     setSelected(new Set());
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
     setActiveTab(tab);
   };
 
-  // 软删除（移到回收站）
+  // ========== 软删除（移入回收站） ==========
   const handleDelete = async (shortCode: string) => {
     if (!confirm(`确定要删除短链接 /${shortCode} 吗？将移入回收站。`)) return;
     try {
@@ -93,7 +94,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 批量软删除
+  // ========== 批量软删除 ==========
   const handleBatchDelete = async () => {
     if (selected.size === 0) {
       alert('请至少选择一个短链接');
@@ -123,7 +124,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 恢复单个
+  // ========== 恢复单个 ==========
   const handleRestore = async (shortCode: string) => {
     if (!confirm(`确定要恢复 /${shortCode} 吗？`)) return;
     try {
@@ -147,7 +148,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 批量恢复
+  // ========== 批量恢复 ==========
   const handleBatchRestore = async () => {
     if (selected.size === 0) {
       alert('请至少选择一个短链接');
@@ -177,7 +178,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 永久删除单个
+  // ========== 永久删除单个 ==========
   const handlePermanentDelete = async (shortCode: string) => {
     if (!confirm(`确定要永久删除 /${shortCode} 吗？此操作不可恢复！`)) return;
     try {
@@ -201,7 +202,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 批量永久删除
+  // ========== 批量永久删除 ==========
   const handleBatchPermanentDelete = async () => {
     if (selected.size === 0) {
       alert('请至少选择一个短链接');
@@ -231,6 +232,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // ========== 选择操作 ==========
   const toggleSelect = (shortCode: string) => {
     setSelected(prev => {
       const newSet = new Set(prev);
@@ -258,6 +260,7 @@ export default function AdminDashboard() {
     router.push('/admin/login');
   };
 
+  // ========== 工具函数 ==========
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '永久';
     const d = new Date(dateStr);
@@ -275,18 +278,12 @@ export default function AdminDashboard() {
     return <div className="flex min-h-screen items-center justify-center text-gray-400">加载中...</div>;
   }
 
-  const tabLabels: Record<TabType, string> = {
-    shorten: '短链接',
-    qrcode: '二维码',
-    voice: '语音',
-    recycle: '🗑️ 回收站',
-  };
-
   const isRecycleTab = activeTab === 'recycle';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
       <div className="max-w-7xl mx-auto">
+        {/* 顶部 */}
         <div className="flex flex-wrap justify-between items-center mb-6 gap-2">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">📊 后台管理</h1>
@@ -308,7 +305,11 @@ export default function AdminDashboard() {
               }`}
               onClick={() => handleTabChange(tab)}
             >
-              {tabLabels[tab]} ({allLinks.length})
+              {tab === 'shorten' && '🔗 短链接'}
+              {tab === 'qrcode' && '📱 二维码'}
+              {tab === 'voice' && '🎙️ 语音'}
+              {tab === 'recycle' && '🗑️ 回收站'}
+              ({allLinks.length})
             </button>
           ))}
         </div>
@@ -358,7 +359,9 @@ export default function AdminDashboard() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="px-4 py-3 w-10"><input type="checkbox" checked={selected.size === allLinks.length && allLinks.length > 0} onChange={toggleSelectAll} /></th>
+                  <th className="px-4 py-3 w-10">
+                    <input type="checkbox" checked={selected.size === allLinks.length && allLinks.length > 0} onChange={toggleSelectAll} />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">短码</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">目标/内容</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">点击</th>
@@ -381,11 +384,17 @@ export default function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {allLinks.length === 0 ? (
-                  <tr><td colSpan={isRecycleTab ? 9 : 9} className="px-4 py-8 text-center text-gray-400">暂无数据</td></tr>
+                  <tr>
+                    <td colSpan={isRecycleTab ? 10 : 10} className="px-4 py-8 text-center text-gray-400">
+                      暂无数据
+                    </td>
+                  </tr>
                 ) : (
                   allLinks.map((link) => (
                     <tr key={link.id} className="hover:bg-gray-50 transition">
-                      <td className="px-4 py-3"><input type="checkbox" checked={selected.has(link.short_code)} onChange={() => toggleSelect(link.short_code)} /></td>
+                      <td className="px-4 py-3">
+                        <input type="checkbox" checked={selected.has(link.short_code)} onChange={() => toggleSelect(link.short_code)} />
+                      </td>
                       <td className="px-4 py-3">
                         <a href={`/${link.short_code}`} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline font-mono text-sm">
                           /{link.short_code}
@@ -411,12 +420,18 @@ export default function AdminDashboard() {
                         </td>
                       )}
                       {isRecycleTab && (
-                        <td className="px-4 py-3 text-sm text-gray-500">{link.deleted_at_formatted || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {link.deleted_at_formatted || '-'}
+                        </td>
                       )}
                       {isRecycleTab && (
                         <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${link.delete_reason_label === '手动删除' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
-                            {link.delete_reason_label || '-'}
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${
+                            link.delete_reason_label === '手动删除' ? 'bg-blue-100 text-blue-600' : 
+                            link.delete_reason_label === '自动过期' ? 'bg-orange-100 text-orange-600' : 
+                            'bg-gray-100 text-gray-500'
+                          }`}>
+                            {link.delete_reason_label || '未知'}
                           </span>
                         </td>
                       )}
@@ -444,7 +459,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* 详情弹窗 */}
+      {/* ========== 详情弹窗 ========== */}
       {showDetail && selectedLink && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetail(false)}>
           <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -453,14 +468,35 @@ export default function AdminDashboard() {
               <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
             <div className="space-y-3">
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500">短码</span><span className="font-mono text-sm">/{selectedLink.short_code}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500">目标</span><span className="text-sm truncate max-w-[200px]">{selectedLink.long_url || '语音'}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500">总点击</span><span className="font-bold text-emerald-600">{selectedLink.click_count || 0}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500">状态</span><span className={`text-sm ${selectedLink.status === '已过期' ? 'text-red-500' : 'text-green-500'}`}>{selectedLink.status}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500">创建时间</span><span className="text-sm">{formatDate(selectedLink.created_at)}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500">有效期</span><span className="text-sm">{selectedLink.expires_at ? formatDate(selectedLink.expires_at) : '永久'}</span></div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">短码</span>
+                <span className="font-mono text-sm">/{selectedLink.short_code}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">目标</span>
+                <span className="text-sm truncate max-w-[200px]">{selectedLink.long_url || '语音'}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">总点击</span>
+                <span className="font-bold text-emerald-600">{selectedLink.click_count || 0}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">状态</span>
+                <span className={`text-sm ${selectedLink.status === '已过期' ? 'text-red-500' : 'text-green-500'}`}>{selectedLink.status}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">创建时间</span>
+                <span className="text-sm">{formatDate(selectedLink.created_at)}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">有效期</span>
+                <span className="text-sm">{selectedLink.expires_at ? formatDate(selectedLink.expires_at) : '永久'}</span>
+              </div>
               {selectedLink.audio_url && (
-                <div className="flex justify-between border-b pb-2"><span className="text-gray-500">文件大小</span><span className="text-sm">{formatFileSize(selectedLink.file_size)}</span></div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-gray-500">文件大小</span>
+                  <span className="text-sm">{formatFileSize(selectedLink.file_size)}</span>
+                </div>
               )}
               <div className="border-b pb-2">
                 <p className="text-gray-500 text-sm mb-1">设备分布</p>

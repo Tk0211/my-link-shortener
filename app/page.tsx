@@ -69,32 +69,34 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'shorten' | 'qr'>('shorten');
   const [showContact, setShowContact] = useState(false);
 
-  // 短链接模块
+  // 短链接
   const [longUrl, setLongUrl] = useState('');
   const [shortUrl, setShortUrl] = useState('');
   const [shortLoading, setShortLoading] = useState(false);
   const [shortError, setShortError] = useState('');
   const [shortExpires, setShortExpires] = useState('1d');
-  const [customCode, setCustomCode] = useState(''); // 自定义短码
+  const [customCode, setCustomCode] = useState('');
 
-  // 二维码模块（带有效期）
+  // 二维码
   const [qrLongUrl, setQrLongUrl] = useState('');
   const [qrShortUrl, setQrShortUrl] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState('');
   const [qrExpires, setQrExpires] = useState('1d');
 
-  // 语音二维码模块
+  // 语音
   const [voiceQrUrl, setVoiceQrUrl] = useState('');
 
-  async function createShortLink(url: string, expires: string, customCode?: string): Promise<string> {
+  // 通用创建短链接（增加 type 参数）
+  async function createShortLink(url: string, expires: string, customCode?: string, type: string = 'shorten'): Promise<string> {
     const res = await fetch('/api/shorten', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         longUrl: url, 
         expiresIn: expires,
-        customCode: customCode || undefined
+        customCode: customCode || undefined,
+        type: type,
       }),
     });
     const data = await res.json();
@@ -109,7 +111,7 @@ export default function Home() {
     setShortError('');
     setShortUrl('');
     try {
-      const url = await createShortLink(longUrl, shortExpires, customCode.trim() || undefined);
+      const url = await createShortLink(longUrl, shortExpires, customCode.trim() || undefined, 'shorten');
       setShortUrl(url);
     } catch (err: any) {
       setShortError(err.message);
@@ -125,8 +127,7 @@ export default function Home() {
     setQrError('');
     setQrShortUrl('');
     try {
-      // 二维码功能保持不变（生成短链接，然后显示二维码）
-      const url = await createShortLink(qrLongUrl, qrExpires);
+      const url = await createShortLink(qrLongUrl, qrExpires, undefined, 'qrcode');
       setQrShortUrl(url);
     } catch (err: any) {
       setQrError(err.message);
@@ -142,7 +143,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-4 bg-gradient-to-br from-emerald-50 to-teal-50">
       <div className="w-full max-w-2xl mx-auto space-y-5">
-        {/* 卡片1：链接转换 + 二维码转换 */}
+        {/* 卡片1 */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm overflow-hidden border border-white/50">
           <div className="flex border-b border-emerald-100">
             <button
@@ -168,7 +169,6 @@ export default function Home() {
           </div>
 
           <div className="p-5">
-            {/* 短链接模块 */}
             {activeTab === 'shorten' && (
               <div>
                 <h2 className="text-xl font-semibold text-center text-gray-700 mb-4">长链接 → 短链接</h2>
@@ -184,7 +184,6 @@ export default function Home() {
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
                     />
                   </div>
-                  {/* 自定义短码输入 */}
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">自定义短码（可选）</label>
                     <div className="flex items-center">
@@ -198,7 +197,7 @@ export default function Home() {
                           const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
                           setCustomCode(val);
                         }}
-                        placeholder="例如 mypage（字母+数字）"
+                        placeholder="例如 mypage"
                         className="flex-1 px-4 py-2 border border-gray-200 rounded-r-xl focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
                         maxLength={20}
                       />
@@ -224,7 +223,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* 二维码模块（带有效期） */}
             {activeTab === 'qr' && (
               <div>
                 <h2 className="text-xl font-semibold text-center text-gray-700 mb-4">链接 → 二维码</h2>
@@ -256,7 +254,7 @@ export default function Home() {
                     <div className="flex justify-center">
                       <QRCodeCanvas value={qrShortUrl} size={160} level="L" />
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">扫描二维码访问（有效期：{qrExpires === 'permanent' ? '永久' : qrExpires.replace('d', '天')}）</p>
+                    <p className="text-xs text-gray-400 mt-2">扫描二维码访问</p>
                   </div>
                 )}
               </div>
@@ -264,7 +262,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 卡片2：录音二维码 */}
+        {/* 卡片2：语音 */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm overflow-hidden border border-white/50">
           <div className="p-5">
             <RecordVoice onSuccess={handleVoiceSuccess} />
@@ -281,7 +279,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ========== 底部联系作者 ========== */}
+      {/* 底部 */}
       <div className="w-full max-w-2xl mx-auto mt-6 text-center">
         <button
           onClick={() => setShowContact(true)}
@@ -290,15 +288,11 @@ export default function Home() {
           联系作者
         </button>
       </div>
-
-      {/* ========== 免责声明 ========== */}
       <div className="w-full max-w-2xl mx-auto mt-2 text-center">
-        <p className="text-xs text-gray-400">
-          本网站为公益性质，仅供合法用途，禁止用于任何违法犯罪活动。
-        </p>
+        <p className="text-xs text-gray-400">本网站为公益性质，仅供合法用途，禁止用于任何违法犯罪活动。</p>
       </div>
 
-      {/* ========== 联系作者二维码弹窗 ========== */}
+      {/* 联系作者弹窗 */}
       {showContact && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -318,11 +312,7 @@ export default function Home() {
               </button>
             </div>
             <div className="flex justify-center">
-              <img
-                src="/wechat-qr.png"
-                alt="微信二维码"
-                className="w-48 h-48 object-contain"
-              />
+              <img src="/wechat-qr.png" alt="微信二维码" className="w-48 h-48 object-contain" />
             </div>
             <p className="text-center text-sm text-gray-500 mt-3">微信扫码联系</p>
           </div>

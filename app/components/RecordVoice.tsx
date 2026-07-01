@@ -51,7 +51,6 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
     setRecording(false);
   };
 
-  // ========== 授权：立即释放，调用时间 < 200ms ==========
   const requestPermission = async () => {
     if (hasPermission) {
       setStatusText('已授权，长按录音');
@@ -61,12 +60,10 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
     setError('');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // 立即停止所有轨道，释放麦克风
       stream.getTracks().forEach((track) => {
         track.stop();
         track.enabled = false;
       });
-      // 不需要保存 stream
       setHasPermission(true);
       setStatusText('已授权，长按录音');
       setTimeout(() => setStatusText('长按录音'), 1500);
@@ -76,7 +73,6 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
     }
   };
 
-  // ========== 长按开始录音（此时才真正调用麦克风） ==========
   const startRecording = async () => {
     if (!hasPermission) {
       setError('请先点击授权麦克风');
@@ -91,8 +87,11 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
     startTimeRef.current = Date.now();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      let stream = streamRef.current;
+      if (!stream || stream.getTracks().some((t) => t.readyState === 'ended')) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+      }
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
@@ -157,7 +156,6 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
     }
   };
 
-  // ========== 松手停止录音 ==========
   const stopRecording = () => {
     if (durationTimerRef.current) {
       clearInterval(durationTimerRef.current);
@@ -171,7 +169,6 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
     }
   };
 
-  // ========== 区分点击和长按 ==========
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
@@ -230,12 +227,15 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
       expiresAt.setDate(expiresAt.getDate() + selectedDays);
       const shortCode = Math.random().toString(36).substring(2, 8);
 
+      // ========== 关键修改：插入数据时增加 type: 'voice' ==========
       const { error: dbError } = await supabase.from('links').insert([
         {
           short_code: shortCode,
           long_url: audioUrl,
           expires_at: expiresAt.toISOString(),
           audio_url: audioUrl,
+          file_size: audioBlob.size,
+          type: 'voice',
         },
       ]);
       if (dbError) throw dbError;
@@ -290,28 +290,15 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
               <div className="w-1.5 h-9 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
             </div>
           ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-12 h-12 text-white"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z"
-              />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-white">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
             </svg>
           )}
         </button>
 
         <div className="mt-2 text-sm text-gray-500">
           {recording ? (
-            <span className="text-red-400 font-medium animate-pulse">
-              🎙️ 录音中 {formatTime(recordDuration)}
-            </span>
+            <span className="text-red-400 font-medium animate-pulse">🎙️ 录音中 {formatTime(recordDuration)}</span>
           ) : (
             <span>{hasPermission ? '长按开始录音' : '点击授权，再长按录音'}</span>
           )}
@@ -337,12 +324,8 @@ export default function RecordVoice({ onSuccess }: RecordVoiceProps) {
               <option value="30">30 天</option>
             </select>
             <div className="flex gap-3">
-              <button onClick={cancelUpload} className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">
-                取消
-              </button>
-              <button onClick={confirmAndUpload} className="flex-1 py-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600">
-                生成
-              </button>
+              <button onClick={cancelUpload} className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">取消</button>
+              <button onClick={confirmAndUpload} className="flex-1 py-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600">生成</button>
             </div>
           </div>
         </div>
